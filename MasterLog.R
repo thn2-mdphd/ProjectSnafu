@@ -140,11 +140,6 @@ View(total)
 View(total)
 write.table(final_table1, "Demographics/table.txt",sep="\t",quote=F,row.names=F)
 
-write.csv(merged, "merged.csv")
-
-
-
-
 # Let's calculate some odds ratios ####
 library(tidyverse)
 #install.packages("ggpubr")
@@ -154,54 +149,130 @@ merged = read.csv("InputData/meta_merged_observed.csv",row.names = 1, check.name
 head(merged)
 str(merged)
 merged$gender <- as.factor(recode(merged$gender, `0` = "Male", `1` = "Female"))
+merged = merged %>% filter(!name=="whl_fds")
 
 merged$age <- recode(merged$age, a = "30-59", c = "<18", y = "18-29", e = "60+")
 merged$age <- fct_relevel(merged$age, levels = c("<18", "18-29", "30-59", "60+"))
 merged$age <- droplevels(merged$age)
 print(dim(merged))
-gender <- merged %>% group_by(gender) %>% summarize(`Percentage wearing face-coverings` = sum(mask, na.rm = TRUE)/n()*100) %>% ggplot(aes(x = as.factor(gender), y = `Percentage wearing face-coverings`)) + geom_bar(stat = "identity") + xlab(" ") + theme_bw()
-age <- merged %>% group_by(age) %>% summarize(`Percentage wearing face-coverings` = sum(mask, na.rm = TRUE)/n()*100) %>% ggplot(aes(x = as.factor(age), y = `Percentage wearing face-coverings`)) + geom_bar(stat = "identity") + xlab(" ") + theme_bw()
+#gender <- merged %>% group_by(gender) %>% summarize(`Percentage wearing face-coverings` = sum(mask, na.rm = TRUE)/n()*100) %>% ggplot(aes(x = as.factor(gender), y = `Percentage wearing face-coverings`)) + geom_bar(stat = "identity") + xlab(" ") + theme_bw()
+#age <- merged %>% group_by(age) %>% summarize(`Percentage wearing face-coverings` = sum(mask, na.rm = TRUE)/n()*100) %>% ggplot(aes(x = as.factor(age), y = `Percentage wearing face-coverings`)) + geom_bar(stat = "identity") + xlab(" ") + theme_bw()
 #merged %>% ggplot(aes(x = workplaces_percent_change_from_baseline)) + geom_histogram()
-gender
-age
-require(foreign)
-require(ggplot2)
-require(MASS)
-install.packages("Hmisc")
-require(Hmisc)
-require(reshape2)
 
+merged$weekend = as.factor(merged$weekend)
 merged$mask = as.factor(merged$mask)
 class(merged$mask)
 
 
-m = polr(mask ~ age + gender + avg_zscore_price_index, data = merged, Hess=TRUE)
 
+sum(is.na(merged$mask))
+model = glm(mask ~ age + avg_zscore_price_index + gender + no_cases + weekend + location, data = merged, family=binomial)
+summary(model)
 
-
-
-
-
-
-
-
-output_glm_logit <- function(place, outcome){
-  data <- merged
-  #d <- summary(glm(get(outcome)~gender + age +avg_zscore_price_index + case_rate + weekend, data = data))
-  d <- summary(glm(location~gender + age +avg_zscore_price_index + case_rate, data = data))
-  
-  print(d)
-  stuff <- data.frame(d$coefficients)[-1,]
-  stuff$name <- c("Male gender", "18-29 yrs old", "30-59 yrs old", "60+", "Price Index", "Cases per 100k")
-  rownames(stuff) <- NULL
-  stuff %>% select(Variable = name, Coefficient = Estimate, pvalue = `Pr...t..`)
-  
-}
+str(merged)
+#View(merged)
+#merged
+OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))))
+OR
+OR[,1]
+# output_glm_logit <- function(place, outcome){
+#   data <- merged
+#   #d <- summary(glm(get(outcome)~gender + age +avg_zscore_price_index + case_rate + weekend, data = data))
+#   d <- summary(glm(location~gender + age +avg_zscore_price_index + case_rate, data = data))
+#   
+#   print(d)
+#   stuff <- data.frame(d$coefficients)[-1,]
+#   stuff$name <- c("Male gender", "18-29 yrs old", "30-59 yrs old", "60+", "Price Index", "Cases per 100k")
+#   rownames(stuff) <- NULL
+#   stuff %>% select(Variable = name, Coefficient = Estimate, pvalue = `Pr...t..`)
+#   
+# }
 #merged %>% ggplot(aes(x = avg_zscore_price_index)) + geom_histogram() + facet_wrap(~weekend)
 #cor(merged$weekend, merged$workplaces_percent_change_from_baseline)
 #table <- ggtexttable(output_glm_logit(c("urban","rural"), "mask"), rows = NULL)
 #ggarrange(gender, age, table, labels = c("B", "C", "D"))
 #ggsave("/content/drive/Shared drives/MSTP 2019/Project - PPE/Figure 2/figure2.png")
 
+# install.packages("meta")
+# library(meta)
+# install.packages("devtools")
+# 
+# library(devtools)
+# devtools::install_github("NightingaleHealth/ggforestplot", build_vignettes = TRUE, force = TRUE)
+# library(tidyverse)
+# library(ggforestplot)
+# 
+# # Get subset of example, log odds ratios, data frame
+# df_logodds <-
+#   df_logodds_associations %>%
+#   dplyr::arrange(name) %>%
+#   dplyr::left_join(ggforestplot::df_NG_biomarker_metadata, by = "name") %>% 
+#   dplyr::filter(group == "Amino acids") %>%
+#   # Set the study variable to a factor to preserve order of appearance
+#   # Set class to factor to set order of display.
+#   dplyr::mutate(
+#     study = factor(
+#       study,
+#       levels = c("Meta-analysis", "NFBC-1997", "DILGOM", "FINRISK-1997", "YFS")
+#     )
+#   )
+# library(ggforestplot)
+# # Forestplot
+# forestplot(
+#   df = df_logodds,
+#   estimate = beta,
+#   logodds = TRUE,
+#   colour = study,
+#   shape = study,
+#   title = "Associations to type 2 diabetes",
+#   xlab = "Odds ratio for incident type 2 diabetes (95% CI)
+#   per 1−SD increment in metabolite concentration"
+# ) +
+#   # You may also want to add a manual shape scale to mark meta-analysis with a
+#   # diamond shape
+#   ggplot2::scale_shape_manual(
+#     values = c(23L, 21L, 21L, 21L, 21L),
+#     labels = c("Meta-analysis", "NFBC-1997", "DILGOM", "FINRISK-1997", "YFS")
+#   )
 
 
+install.packages("forestplot")
+library(forestplot)
+forest = structure(list(
+  mean = OR[,1],
+  lower = OR[,2],
+  upper = OR[,3],
+  .Names = c("mean", "lower", "upper"), 
+  row.names = c(NA, -11L), 
+  class = "data.frame")
+)
+
+
+tabletext<-cbind(
+  c("", "Study", "Auckland", "Block", 
+    "Doran", "Gamsu", "Morrison", "Papageorgiou", 
+    "Tauesch", NA, "Summary"),
+  c("Deaths", "(steroid)", "36", "1", 
+    "4", "14", "3", "1", 
+    "8", NA, NA),
+  c("Deaths", "(placebo)", "60", "5", 
+    "11", "20", "7", "7", 
+    "10", NA, NA),
+  c("", "OR", "0.58", "0.16", 
+    "0.25", "0.70", "0.35", "0.14", 
+    "1.02", NA, "0.53"))
+
+
+
+library(forestplot)
+# Cochrane data from the 'rmeta'-package
+cochrane_from_rmeta <- 
+  structure(list(
+    mean  = c(NA, NA, 0.578, 0.165, 0.246, 0.700, 0.348, 0.139, 1.017, NA, 0.531), 
+    lower = c(NA, NA, 0.372, 0.018, 0.072, 0.333, 0.083, 0.016, 0.365, NA, 0.386),
+    upper = c(NA, NA, 0.898, 1.517, 0.833, 1.474, 1.455, 1.209, 2.831, NA, 0.731)),
+    .Names = c("mean", "lower", "upper"), 
+    row.names = c(NA, -11L), 
+    class = "data.frame")
+forestplot(tabletext,
+           cochrane_from_rmeta)
