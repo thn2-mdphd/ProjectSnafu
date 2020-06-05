@@ -166,8 +166,10 @@ class(merged$mask)
 
 
 sum(is.na(merged$mask))
-model = glm(mask ~ age + avg_zscore_price_index + gender + no_cases + weekend + location, data = merged, family=binomial)
+model = glm(location ~ avg_zscore_price_index, data = merged, family=binomial)
 summary(model)
+
+plot(merged$avg_zscore_price_index,merged$location)
 
 str(merged)
 #View(merged)
