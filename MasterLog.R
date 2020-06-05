@@ -13,13 +13,14 @@ library(tidyverse)
 setwd('~/Documents/GitHub/ProjectSnafu')
 
 # Generate Price Index ####
-ppe_meta = read.csv("InputData/ppe_meta_data.csv", stringsAsFactors = FALSE)
+ppe_meta = read.csv("./ProjectSnafu/InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv", stringsAsFactors = FALSE)
 
 ppe_meta = ppe_meta %>% filter(type=="grocery")
 
 str(ppe_meta)
 ppe_meta$price_of_good <- as.numeric(ppe_meta$price_of_good)
 AvgZscorePriceIndex <- ppe_meta %>%
+  filter(!(name_of_good=="oranges")) %>% 
   group_by(name_of_good) %>% 
   mutate(zscore_price = (price_of_good-mean(price_of_good, na.rm = TRUE))/sd(price_of_good, na.rm = TRUE)) %>% 
   group_by(id) %>% 
@@ -33,7 +34,8 @@ AvgZscorePriceIndex <- ppe_meta %>%
 
 small_PI_table <- AvgZscorePriceIndex %>% 
   select(id, avg_zscore_price_index, median_zscore_price_index)
-ppe_obs <- read.csv("InputData/ppe_observation_data.csv", stringsAsFactors = FALSE) %>% filter(type=="grocery") %>% 
+ppe_obs <- read.csv("./ProjectSnafu/InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1.csv", stringsAsFactors = FALSE) %>% 
+  filter(type=="grocery") %>% 
   left_join(small_PI_table, by = "id")
 
 ppe_obs[is.na(ppe_obs)] <- 0
@@ -51,21 +53,10 @@ old_age_to_new_age_mapping <- data.frame(age = c("a", "e", "y", "c", "t"),
                                          age_two_bins = c("30+", "30+", "0-29", "0-29", "0-29"))
 
 merged <- merged %>% left_join(old_age_to_new_age_mapping, by = "age")
-merged$age <- replace(merged$age, merged$age=="A", "a")
-merged$age <- replace(merged$age, merged$age=="E", "e")
-merged$age <- replace(merged$age, merged$age=="Y", "y")
-merged$age <- replace(merged$age, merged$age=="C", "c")
-
-old_age_to_new_age_mapping <- data.frame(age = c("a", "e", "y", "c", "t"),
-                                         age_two_bins = c("30+", "30+", "0-29", "0-29", "0-29"))
-
-merged <- merged %>% left_join(old_age_to_new_age_mapping, by = "age")
-
-
-
+merged$location <- replace(merged$location, merged$location=="rurual", "rural")
 
 hist(merged$avg_zscore_price_index)
-write.csv(merged, "InputData/meta_merged_observed.csv")
+write.csv(merged, "./ProjectSnafu/InputData/meta_merged_observed.csv")
 # Table 1 ####
 library(tidyverse)
 #merged <- read.csv("/content/drive/Shared drives/MSTP 2019/Users/Emma/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% filter(!(age %in% c("t", "0")), !(name %in% c("whl_fds", "metfalfes")), type == "grocery")
@@ -135,20 +126,18 @@ colnames(total) = colnames(table1)
 #colnames(table1) <- c("County", "Total", "Male", "Female", "<18", "18-29", "30-59", "60+", "Price Index", "Cases per 100k")
 final_table1 = rbind(table1,total)
 View(final_table1)
-View(table1)
-View(total)
-View(total)
-write.table(final_table1, "Demographics/table.txt",sep="\t",quote=F,row.names=F)
+
+write.table(final_table1, "./ProjectSnafu/Demographics/table.txt",sep="\t",quote=F,row.names=F)
 
 # Let's calculate some odds ratios ####
-library(tidyverse)
 #install.packages("ggpubr")
 library(ggpubr)
 #merged <- read.csv("/content/drive/Shared drives/MSTP 2019/Project - PPE/meta_merged_observed_mobility_race_income.csv") %>% filter(!(age %in% c("t", "0")), !(name %in% c("whl_fds", "metfalfes")), type == "grocery")
-merged = read.csv("InputData/meta_merged_observed.csv",row.names = 1, check.names = F, stringsAsFactors = 1)
+merged = read.csv("./ProjectSnafu/InputData/meta_merged_observed.csv",row.names = 1, check.names = F, stringsAsFactors = 1)
 head(merged)
 str(merged)
 merged$gender <- as.factor(recode(merged$gender, `0` = "Male", `1` = "Female"))
+merged$gender <- fct_relevel(merged$gender, ref = "Male")
 merged = merged %>% filter(!name=="whl_fds")
 
 merged$age <- recode(merged$age, a = "30-59", c = "<18", y = "18-29", e = "60+")
@@ -159,14 +148,14 @@ print(dim(merged))
 #age <- merged %>% group_by(age) %>% summarize(`Percentage wearing face-coverings` = sum(mask, na.rm = TRUE)/n()*100) %>% ggplot(aes(x = as.factor(age), y = `Percentage wearing face-coverings`)) + geom_bar(stat = "identity") + xlab(" ") + theme_bw()
 #merged %>% ggplot(aes(x = workplaces_percent_change_from_baseline)) + geom_histogram()
 
-merged$weekend = as.factor(merged$weekend)
+#merged$weekend = as.factor(merged$weekend)
 merged$mask = as.factor(merged$mask)
 class(merged$mask)
 
 
 
 sum(is.na(merged$mask))
-model = glm(mask ~ age + avg_zscore_price_index + gender + no_cases + weekend + location, data = merged, family=binomial)
+model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family=binomial)
 summary(model)
 
 str(merged)
@@ -174,7 +163,6 @@ str(merged)
 #merged
 OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))))
 OR
-OR[,1]
 # output_glm_logit <- function(place, outcome){
 #   data <- merged
 #   #d <- summary(glm(get(outcome)~gender + age +avg_zscore_price_index + case_rate + weekend, data = data))
@@ -238,32 +226,47 @@ OR[,1]
 
 install.packages("forestplot")
 library(forestplot)
-forest = structure(list(
-  mean = OR[,1],
-  lower = OR[,2],
-  upper = OR[,3],
-  .Names = c("mean", "lower", "upper"), 
-  row.names = c(NA, -11L), 
-  class = "data.frame")
-)
+#forest = structure(list(
+#  mean = OR[,1],
+#  lower = OR[,2],
+#  upper = OR[,3],
+#  .Names = c("mean", "lower", "upper"), 
+#  row.names = c(NA, -7L), 
+#  class = "data.frame")
+#)
 
+#forestplot(forest)
+#tabletext<-cbind(
+#  c(" ", row.names(OR)),
+#  c("Mean", OR[,1]),
+#  c("Lower CI", OR[,2]),
+#  c("Upper CI", OR[,3]))
+
+abbreviated_1 <- OR[-1,1]
+abbreviated_2 <- OR[-1,2]
+abbreviated_3 <- OR[-1,3]
 
 tabletext<-cbind(
-  c("", "Study", "Auckland", "Block", 
-    "Doran", "Gamsu", "Morrison", "Papageorgiou", 
-    "Tauesch", NA, "Summary"),
-  c("Deaths", "(steroid)", "36", "1", 
-    "4", "14", "3", "1", 
-    "8", NA, NA),
-  c("Deaths", "(placebo)", "60", "5", 
-    "11", "20", "7", "7", 
-    "10", NA, NA),
-  c("", "OR", "0.58", "0.16", 
-    "0.25", "0.70", "0.35", "0.14", 
-    "1.02", NA, "0.53"))
+  c(" ", "Young adult", "Adult", "Older Adult", "Price Index", "Female Gender", "Case rate"),
+  c("Mean", round(abbreviated_1, 2)),
+  c("Lower CI", round(abbreviated_2, 2)),
+  c("Upper CI", round(abbreviated_3, 2)))
 
-
-
+pdf("forestplot.pdf")
+forestplot( labeltext = tabletext, 
+           mean = c(NA, abbreviated_1), 
+           lower = c(NA, abbreviated_2), 
+           upper = c(NA, abbreviated_3), 
+           ci.vertices = T,
+           is.summary = c(TRUE, rep(FALSE, 7)),
+           boxsize = 0.25,
+           txt_gp = fpTxtGp(ticks = gpar(cex = 1.2), xlab = gpar(cex = 1.2)),
+           xlab = "Odds Ratio",
+           xticks = c(0, 1, 2, 3, 4, 5, 6),
+           hrzl_lines = gpar(col = "#444444"),
+           linesheight = "lines", 
+           new_page = FALSE)
+dev.off()
 library(forestplot)
 # Cochrane data from the 'rmeta'-package
 cochrane_from_rmeta <- 
