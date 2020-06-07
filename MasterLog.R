@@ -158,7 +158,7 @@ merged <- merged %>% mutate(severity = case_when(
 ))
 merged$severity <- as.factor(merged$severity)
 sum(is.na(merged$mask))
-model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family=binomial)
+model = glm(mask ~ age + avg_zscore_price_index + gender + severity, data = merged, family=binomial)
 summary(model)
 
 str(merged)
@@ -252,13 +252,13 @@ abbreviated_4 <- OR[-1,4]
 
 
 tabletext<-cbind(
-  c(" ", "Young adult", "Adult", "Older Adult", "Price Index", "Female Gender", "Case prevalence/100K"),
+  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
   c("aOR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
   c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
   c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
   c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
 tabletext
-png("forestplot.png", width=2400, height=960)
+png("forestplot.png", width =2400, height=980)
 forestplot( labeltext = tabletext, 
            mean = c(NA, abbreviated_1), 
            lower = c(NA, abbreviated_2), 
@@ -266,14 +266,15 @@ forestplot( labeltext = tabletext,
            ci.vertices = T,
            is.summary = c(TRUE, rep(FALSE, 7)),
            fn.ci_norm = fpDrawCircleCI, 
-           boxsize = 0.1,
-           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3.6), label = gpar(cex =4)),
-           xlab = "Odds Ratio (log scale)",
-           lwd.ci = 4,
+           boxsize = 0.3,
+           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
+           xlab = " ",
+           lwd.ci = 6,
            xlog = TRUE,
            #xticks = c(0, 1, 2, 3, 4, 5, 6),
            hrzl_lines = gpar(col = "#444444"),
            linesheight = "lines", 
-           new_page = FALSE)
+           new_page = FALSE,
+           col = fpColors(box = c("black"), lines = "black"))
 dev.off()
 
