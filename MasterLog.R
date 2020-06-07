@@ -134,11 +134,10 @@ write.table(final_table1, "./ProjectSnafu/Demographics/table.txt",sep="\t",quote
 library(ggpubr)
 #merged <- read.csv("/content/drive/Shared drives/MSTP 2019/Project - PPE/meta_merged_observed_mobility_race_income.csv") %>% filter(!(age %in% c("t", "0")), !(name %in% c("whl_fds", "metfalfes")), type == "grocery")
 merged = read.csv("./ProjectSnafu/InputData/meta_merged_observed.csv",row.names = 1, check.names = F, stringsAsFactors = 1)
-head(merged)
-str(merged)
+
 merged$gender <- as.factor(recode(merged$gender, `0` = "Male", `1` = "Female"))
 merged$gender <- fct_relevel(merged$gender, ref = "Male")
-merged = merged %>% filter(!name=="whl_fds")
+#merged = merged %>% filter(!name=="whl_fds")
 
 merged$age <- recode(merged$age, a = "30-59", c = "<18", y = "18-29", e = "60+")
 merged$age <- fct_relevel(merged$age, levels = c("<18", "18-29", "30-59", "60+"))
@@ -153,7 +152,11 @@ merged$mask = as.factor(merged$mask)
 class(merged$mask)
 
 
-
+merged <- merged %>% mutate(severity = case_when(
+  case_rate < 800 ~ 0,
+  case_rate >= 800 ~ 1
+))
+merged$severity <- as.factor(merged$severity)
 sum(is.na(merged$mask))
 model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family=binomial)
 summary(model)
@@ -161,7 +164,7 @@ summary(model)
 str(merged)
 #View(merged)
 #merged
-OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))))
+OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4])
 OR
 # output_glm_logit <- function(place, outcome){
 #   data <- merged
@@ -245,37 +248,32 @@ library(forestplot)
 abbreviated_1 <- OR[-1,1]
 abbreviated_2 <- OR[-1,2]
 abbreviated_3 <- OR[-1,3]
+abbreviated_4 <- OR[-1,4]
+
 
 tabletext<-cbind(
-  c(" ", "Young adult", "Adult", "Older Adult", "Price Index", "Female Gender", "Case rate"),
-  c("Mean", round(abbreviated_1, 2)),
-  c("Lower CI", round(abbreviated_2, 2)),
-  c("Upper CI", round(abbreviated_3, 2)))
-
-pdf("forestplot.pdf")
+  c(" ", "Young adult", "Adult", "Older Adult", "Price Index", "Female Gender", "Case prevalence/100K"),
+  c("aOR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
+  c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
+  c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
+  c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
+tabletext
+png("forestplot.png", width=2400, height=960)
 forestplot( labeltext = tabletext, 
            mean = c(NA, abbreviated_1), 
            lower = c(NA, abbreviated_2), 
            upper = c(NA, abbreviated_3), 
            ci.vertices = T,
            is.summary = c(TRUE, rep(FALSE, 7)),
-           boxsize = 0.25,
-           txt_gp = fpTxtGp(ticks = gpar(cex = 1.2), xlab = gpar(cex = 1.2)),
-           xlab = "Odds Ratio",
-           xticks = c(0, 1, 2, 3, 4, 5, 6),
+           fn.ci_norm = fpDrawCircleCI, 
+           boxsize = 0.1,
+           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3.6), label = gpar(cex =4)),
+           xlab = "Odds Ratio (log scale)",
+           lwd.ci = 4,
+           xlog = TRUE,
+           #xticks = c(0, 1, 2, 3, 4, 5, 6),
            hrzl_lines = gpar(col = "#444444"),
            linesheight = "lines", 
            new_page = FALSE)
 dev.off()
-library(forestplot)
-# Cochrane data from the 'rmeta'-package
-cochrane_from_rmeta <- 
-  structure(list(
-    mean  = c(NA, NA, 0.578, 0.165, 0.246, 0.700, 0.348, 0.139, 1.017, NA, 0.531), 
-    lower = c(NA, NA, 0.372, 0.018, 0.072, 0.333, 0.083, 0.016, 0.365, NA, 0.386),
-    upper = c(NA, NA, 0.898, 1.517, 0.833, 1.474, 1.455, 1.209, 2.831, NA, 0.731)),
-    .Names = c("mean", "lower", "upper"), 
-    row.names = c(NA, -11L), 
-    class = "data.frame")
-forestplot(tabletext,
-           cochrane_from_rmeta)
+
