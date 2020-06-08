@@ -1,20 +1,22 @@
 # EMMA J. GRAHAM LINCK, MS
 # Edited by Tung Nguyen - June 7, 2020
 
-
-
+# Setup packages ####
 ### Install packages only if not present
 if (!require("ggpubr")) install.packages("ggpubr")
 if (!require("tidyverse")) install.packages("tidyverse")
+
+### Loading packages
 library(tidyverse); library(ggpubr)
 
-
+### Setting working directory for Github repo
 setwd('~/Documents/GitHub/ProjectSnafu')
 
 
-# assessing representativeness of sample #####
+# SECTION 1: Assessing representativeness of sample #####
 census_income <- read.csv("InputData/ACSST5Y2018.S1903_data_with_overlays_2020-05-29T093325.csv",
                    skip = 1, stringsAsFactors = FALSE)
+View(census_income)
 census_income$Estimate..Median.income..dollars...FAMILIES..Families <- as.numeric(census_income$Estimate..Median.income..dollars...FAMILIES..Families)
 census_population <- read.csv("InputData/ACSST5Y2018.S0101_data_with_overlays_2020-05-29T133200.csv", stringsAsFactors = FALSE,
                               skip = 1)
@@ -28,7 +30,7 @@ ppe_meta <- ppe_meta %>%
   mutate(tag = "1400000US")%>% 
   unite(complete_id, c(tag, geo_id), sep = "", remove = FALSE)
 ppe_id_match <- ppe_meta %>% select(id, complete_id) %>% unique()
-ppe_obs <- read.csv("./ProjectSnafu/InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
+ppe_obs <- read.csv("InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
   left_join(ppe_id_match, by = "id") %>% 
   group_by(complete_id) %>% 
   summarize(n = n())
