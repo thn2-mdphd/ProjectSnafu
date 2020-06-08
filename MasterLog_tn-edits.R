@@ -9,6 +9,9 @@
 if (!require("ggpubr")) install.packages("ggpubr")
 if (!require("tidyverse")) install.packages("tidyverse")
 if (!require("forestplot")) install.packages("forestplot")
+if (!require("ggmap")) install.packages("ggmap")
+if (!require("maps")) install.packages("maps")
+if (!require("mapdata")) install.packages("mapdata")
 
 ### Loading packages
 library(ggpubr); library(tidyverse); library(forestplot)
@@ -17,7 +20,7 @@ library(ggpubr); library(tidyverse); library(forestplot)
 setwd('~/Documents/GitHub/ProjectSnafu')
 
 # SECTION 1: Generate Price Index AND combine into observation table ####
-ppe_meta = read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv", stringsAsFactors = FALSE)
+ppe_meta = read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1 (1).csv", stringsAsFactors = FALSE)
 ppe_meta = ppe_meta %>% filter(type=="grocery")
 str(ppe_meta)
 ppe_meta$price_of_good = as.numeric(ppe_meta$price_of_good)
@@ -35,7 +38,7 @@ AvgZscorePriceIndex = ppe_meta %>%
 # Making combined file of ppe and avg price
 small_PI_table = AvgZscorePriceIndex %>% 
   select(id, avg_zscore_price_index, median_zscore_price_index)
-ppe_obs = read.csv("InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1.csv", stringsAsFactors = FALSE) %>% 
+ppe_obs = read.csv("InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1 (2).csv", stringsAsFactors = FALSE) %>% 
   filter(type=="grocery") %>% 
   left_join(small_PI_table, by = "id")
 
@@ -128,56 +131,56 @@ abline(v=threshold,col="red")
 
 test = merged
 
-#test = merged %>% group_by(county) %>% select(county, case_rate) %>% unique()
-#plot(density(test$case_rate))
-#abline(v=threshold,col="red")
-sum(test$case_rate > threshold) # 4: milwaukee, racine, brown and kenosha - large urban centers
-sum(test$case_rate < threshold) # 17: including dane (urban, but different: high mask, low prevalence) twice for different days, so total of 20
-
-# expand now to all observations, not county
-#test = merged$case_rate
-sum(test > threshold) # 613 observations in high prevalence
-sum(test < threshold) # 2658 observations in low prevalence
-
-# Threshold is set OK
-merged = merged %>% mutate(severity = case_when(
-  case_rate < threshold ~ 0,
-  case_rate >= threshold ~ 1
-))
-
-# side show: scratch block ####
-test = test %>% mutate(severity = case_when(
-  case_rate < threshold ~ 0,
-  case_rate >= threshold ~ 1
-))
-
-merged$severity = as.factor(merged$severity)
-sum(is.na(merged$mask))
-
-
-test = merged
-#
+# #test = merged %>% group_by(county) %>% select(county, case_rate) %>% unique()
+# #plot(density(test$case_rate))
+# #abline(v=threshold,col="red")
+# sum(test$case_rate > threshold) # 4: milwaukee, racine, brown and kenosha - large urban centers
+# sum(test$case_rate < threshold) # 17: including dane (urban, but different: high mask, low prevalence) twice for different days, so total of 20
+# 
+# # expand now to all observations, not county
+# #test = merged$case_rate
+# sum(test > threshold) # 613 observations in high prevalence
+# sum(test < threshold) # 2658 observations in low prevalence
+# 
+# # Threshold is set OK
+# merged = merged %>% mutate(severity = case_when(
+#   case_rate < threshold ~ 0,
+#   case_rate >= threshold ~ 1
+# ))
+# 
+# # side show: scratch block ####
+# test = test %>% mutate(severity = case_when(
+#   case_rate < threshold ~ 0,
+#   case_rate >= threshold ~ 1
+# ))
+# 
+# merged$severity = as.factor(merged$severity)
+# sum(is.na(merged$mask))
+# 
+# 
+# test = merged
+# #
 #test[test$county=="kenosha","case_rate"] = 756
 #View(test)
-model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = test, family = binomial)
-summary(model)
-OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
-OR
-
-threshold = 600
-test = test %>% mutate(severity = case_when(
-  case_rate < threshold ~ 0,
-  case_rate >= threshold ~ 1
-))
-model = glm(mask ~ age + avg_zscore_price_index + gender + severity, data = test, family = binomial)
-summary(model)
-
-OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
-OR
+# model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = test, family = binomial)
+# summary(model)
+# OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
+# OR
+# 
+# threshold = 600
+# test = test %>% mutate(severity = case_when(
+#   case_rate < threshold ~ 0,
+#   case_rate >= threshold ~ 1
+# ))
+# model = glm(mask ~ age + avg_zscore_price_index + gender + severity, data = test, family = binomial)
+# summary(model)
+# 
+# OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
+# OR
 
 # regular show: actual block ####
 # Running the logistic regression
-model = glm(mask ~ age + avg_zscore_price_index + gender + severity, data = merged, family = binomial)
+model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
 summary(model)
 
 # Converting logistic regression coef. into adjusted OR
@@ -219,3 +222,75 @@ forestplot(labeltext = tabletext,
            col = fpColors(box = c("black"), lines = "black"))
 dev.off()
 
+
+##Generating map figure
+
+
+
+#state of WI boundary and is saved as a list with x,y,coordinates
+#of graph called range, and names 
+#wisconsin<- map_data('state','wisconsin',fill=FALSE, col=pallete())
+#head(wisconsin)
+
+library(ggmap)
+library(maps)
+library(mapdata)
+
+
+#pull state boundaries
+states<- map_data("state")
+wisconsin<-subset(states,region =='wisconsin')
+
+#add in county lines
+#column headers are: long,lat,group,order,region,subregion
+usa_counties<-map_data('county')
+counties<-subset(usa_counties,region=='wisconsin')
+counties$subregion <- replace(counties$subregion, counties$subregion=="st croix", "st_croix")
+counties$subregion <- replace(counties$subregion, counties$subregion=="fond du lac", "fond_du_lac")
+
+observation_data <- read.csv("./InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
+  group_by(county) %>% 
+  summarize(`Face Covering Use (%)` = sum(mask, na.rm = TRUE)/n()*100, `COVID-19 Prevalence \n(per 100K)` = mean(case_rate, na.rm = TRUE)) %>% 
+  unique() %>% 
+  left_join(counties, by = c("county" = "subregion")) %>% unique() 
+
+#counties we observed in
+#view the data to see which ones to pull
+
+#pull all rows with subregion of adams,brown,dane,grant,eau claire,green,iowa,
+#jackson,kenosha,lafayette,milwaukee,monroe, outagamie,st croix,pierce,polk,
+#rock, walworth, wood
+observed_counties<-observation_data%>% 
+  filter(county %in% c('adams','brown','dane','grant','iowa',
+                       'jackson','kenosha','lafayette','milwaukee',
+                       'monroe','outagamie','st_croix','pierce','polk','walworth','wood','racine', 'winnebago', 'waushara','fond_du_lac'))
+
+head(observed_counties) #make sure it has all the columns still
+
+library(RColorBrewer)
+
+#blank WI with no gridlines in background and fixed coordinates so increasing 
+#figure wont change dimensions
+WIoutline<-ggplot(data=wisconsin,mapping=aes(x=long,y=lat,group=group)) + 
+  coord_fixed(1.4)+ geom_polygon(fill="white",color="black", size = 0.01)
+#add in the county lines with black outlines and safe as WIcounty
+WIoutline
+WIcounty<-WIoutline+ theme_nothing(legend = TRUE) + geom_polygon(data=counties, fill = NA, color='black',size=0.05)+
+  geom_polygon(color='black',fill=NA, size = 0.05)
+WIcounty
+WImask <- WIcounty + geom_polygon(aes(fill = `Face Covering Use (%)`), data = observed_counties) + 
+  scale_fill_distiller(palette = "Greys", direction = 1)
+WImask
+
+#add in counties that we observed at outlined in red
+WIobserved<-WImask+geom_polygon( aes(color = `COVID-19 Prevalence \n(per 100K)`), data=observed_counties,
+                                   fill=NA, size = 1) + scale_color_distiller(palette = "RdYlBu")
+  #geom_polygon(color='black',fill=NA)
+WIobserved
+
+ggsave("Fig1A.png")
+
+
+##NOTE TO TUNG: should have two files saved in root. One is Fig1A.png and the other is forestplot.png. 
+#Both plots go in figure_continuous.pptx file. X axis labels for forest plot are in ppt, so you can edit directly there. 
+#To change "COVID-19 Prevalence" title, change line 253. Remember to change all subsequent references to that variable name. 
