@@ -14,13 +14,13 @@ if (!require("maps")) install.packages("maps")
 if (!require("mapdata")) install.packages("mapdata")
 
 ### Loading packages
-library(ggpubr); library(tidyverse); library(forestplot)
+#library(ggpubr); library(tidyverse); library(forestplot)
 
 ### Setting working directory for Github repo
 setwd('~/Documents/GitHub/ProjectSnafu')
 
 # SECTION 1: Generate Price Index AND combine into observation table ####
-ppe_meta = read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1 (1).csv", stringsAsFactors = FALSE)
+ppe_meta = read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv", stringsAsFactors = FALSE)
 ppe_meta = ppe_meta %>% filter(type=="grocery")
 str(ppe_meta)
 ppe_meta$price_of_good = as.numeric(ppe_meta$price_of_good)
@@ -38,7 +38,7 @@ AvgZscorePriceIndex = ppe_meta %>%
 # Making combined file of ppe and avg price
 small_PI_table = AvgZscorePriceIndex %>% 
   select(id, avg_zscore_price_index, median_zscore_price_index)
-ppe_obs = read.csv("InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1 (2).csv", stringsAsFactors = FALSE) %>% 
+ppe_obs = read.csv("InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1.csv", stringsAsFactors = FALSE) %>% 
   filter(type=="grocery") %>% 
   left_join(small_PI_table, by = "id")
 
@@ -229,7 +229,7 @@ dev.off()
 
 #state of WI boundary and is saved as a list with x,y,coordinates
 #of graph called range, and names 
-#wisconsin<- map_data('state','wisconsin',fill=FALSE, col=pallete())
+#wisconsin= map_data('state','wisconsin',fill=FALSE, col=pallete())
 #head(wisconsin)
 
 library(ggmap)
@@ -238,17 +238,17 @@ library(mapdata)
 
 
 #pull state boundaries
-states<- map_data("state")
-wisconsin<-subset(states,region =='wisconsin')
+states= map_data("state")
+wisconsin=subset(states,region =='wisconsin')
 
 #add in county lines
 #column headers are: long,lat,group,order,region,subregion
-usa_counties<-map_data('county')
-counties<-subset(usa_counties,region=='wisconsin')
-counties$subregion <- replace(counties$subregion, counties$subregion=="st croix", "st_croix")
-counties$subregion <- replace(counties$subregion, counties$subregion=="fond du lac", "fond_du_lac")
+usa_counties=map_data('county')
+counties=subset(usa_counties,region=='wisconsin')
+counties$subregion = replace(counties$subregion, counties$subregion=="st croix", "st_croix")
+counties$subregion = replace(counties$subregion, counties$subregion=="fond du lac", "fond_du_lac")
 
-observation_data <- read.csv("./InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
+observation_data = read.csv("./InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
   group_by(county) %>% 
   summarize(`Face Covering Use (%)` = sum(mask, na.rm = TRUE)/n()*100, `COVID-19 Prevalence \n(per 100K)` = mean(case_rate, na.rm = TRUE)) %>% 
   unique() %>% 
@@ -260,7 +260,7 @@ observation_data <- read.csv("./InputData/meta_merged_observed.csv", stringsAsFa
 #pull all rows with subregion of adams,brown,dane,grant,eau claire,green,iowa,
 #jackson,kenosha,lafayette,milwaukee,monroe, outagamie,st croix,pierce,polk,
 #rock, walworth, wood
-observed_counties<-observation_data%>% 
+observed_counties=observation_data%>% 
   filter(county %in% c('adams','brown','dane','grant','iowa',
                        'jackson','kenosha','lafayette','milwaukee',
                        'monroe','outagamie','st_croix','pierce','polk','walworth','wood','racine', 'winnebago', 'waushara','fond_du_lac'))
@@ -271,22 +271,27 @@ library(RColorBrewer)
 
 #blank WI with no gridlines in background and fixed coordinates so increasing 
 #figure wont change dimensions
-WIoutline<-ggplot(data=wisconsin,mapping=aes(x=long,y=lat,group=group)) + 
-  coord_fixed(1.4)+ geom_polygon(fill="white",color="black", size = 0.01)
+WIoutline = ggplot(data = wisconsin, mapping = aes(x = long, y = lat, group = group)) + 
+  coord_fixed(1.4) + geom_polygon(fill = "white", color = "black", size = 0.01)
 #add in the county lines with black outlines and safe as WIcounty
 WIoutline
-WIcounty<-WIoutline+ theme_nothing(legend = TRUE) + geom_polygon(data=counties, fill = NA, color='black',size=0.05)+
-  geom_polygon(color='black',fill=NA, size = 0.05)
+WIcounty = WIoutline+ theme_nothing(legend = TRUE) + geom_polygon(data=counties, fill = NA, color='black', size=0.05)+
+  geom_polygon(color='black', fill=NA, size = 0.05)
 WIcounty
-WImask <- WIcounty + geom_polygon(aes(fill = `Face Covering Use (%)`), data = observed_counties) + 
+WImask = WIcounty + geom_polygon(aes(fill = `Face Covering Use (%)`), data = observed_counties) + 
   scale_fill_distiller(palette = "Greys", direction = 1)
 WImask
 
+# custom name for COVID Prevalence per 100,000
+observed_counties = observed_counties %>% rename(`COVID-19 Prevalence \n(per 100,000)` = `COVID-19 Prevalence \n(per 100K)`)
+
 #add in counties that we observed at outlined in red
-WIobserved<-WImask+geom_polygon( aes(color = `COVID-19 Prevalence \n(per 100K)`), data=observed_counties,
+WIobserved = WImask + geom_polygon(aes(color = `COVID-19 Prevalence \n(per 100,000)`), data=observed_counties,
                                    fill=NA, size = 1) + scale_color_distiller(palette = "RdYlBu")
   #geom_polygon(color='black',fill=NA)
-WIobserved
+WIobserved + theme(legend.key.size = unit(.75, "cm"),
+                   legend.title = element_text(size = 16),
+                   legend.text = element_text(size = 14))
 
 ggsave("Fig1A.png")
 
