@@ -111,8 +111,10 @@ merged = read.csv("InputData/meta_merged_observed.csv",row.names = 1, check.name
 merged$gender = as.factor(recode(merged$gender, `0` = "Male", `1` = "Female"))
 merged$gender = fct_relevel(merged$gender, ref = "Male")
 
-merged$age = recode(merged$age, a = "30-59", c = "<18", y = "18-29", e = "60+")
-merged$age = fct_relevel(merged$age, levels = c("<18", "18-29", "30-59", "60+"))
+#merged$age = recode(merged$age, a = "30-59", c = "<18", y = "18-29", e = "60+")
+#merged$age = fct_relevel(merged$age, levels = c("<18", "18-29", "30-59", "60+"))
+merged$age = fct_relevel(merged$age, levels = c("c", "y", "a", "e"))
+
 merged$age = droplevels(merged$age)
 print(dim(merged))
 
@@ -298,4 +300,59 @@ ggsave("Fig1A.png")
 
 ##NOTE TO TUNG: should have two files saved in root. One is Fig1A.png and the other is forestplot.png. 
 #Both plots go in figure_continuous.pptx file. X axis labels for forest plot are in ppt, so you can edit directly there. 
-#To change "COVID-19 Prevalence" title, change line 253. Remember to change all subsequent references to that variable name. 
+#To change "COVID-19 Prevalence" title, change line 253. Remember to change all subsequent references to that variable name.
+
+
+
+######### RELATIVE RISK June 18 TN #####
+model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
+# ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
+set.seed(123)
+coefini = coef(glm(mask ~ gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log")))
+modelRR = glm(mask ~ age + gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log"), start=c(coefini,0,0,0))
+summary(modelRR)
+exp(coef(modelRR))
+
+model = modelRR
+
+RR = data.frame(exp(cbind("Relative risk" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
+RR
+
+RR = RR[c("agey","agea","agee","avg_zscore_price_index","genderFemale","case_rate"),]
+
+abbreviated_1 = RR[,1]
+abbreviated_2 = RR[,2]
+abbreviated_3 = RR[,3]
+abbreviated_4 = RR[,4]
+
+
+tabletext=cbind(
+  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
+  c("aRR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
+  c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
+  c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
+  c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
+tabletext
+png("forestplot_RR.png", width = 2400, height = 980)
+forestplot(labeltext = tabletext, 
+           mean = c(NA, abbreviated_1), 
+           lower = c(NA, abbreviated_2), 
+           upper = c(NA, abbreviated_3), 
+           ci.vertices = T,
+           is.summary = c(TRUE, rep(FALSE, 7)),
+           fn.ci_norm = fpDrawCircleCI, 
+           boxsize = 0.3,
+           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
+           xlab = " ",
+           lwd.ci = 6,
+           xlog = TRUE,
+           #xticks = c(0, 1, 2, 3, 4, 5, 6),
+           hrzl_lines = gpar(col = "#444444"),
+           linesheight = "lines", 
+           new_page = FALSE,
+           col = fpColors(box = c("black"), lines = "black"))
+dev.off()
+
+# some resources for how tung modeled this code:
+# https://stats.idre.ucla.edu/stata/faq/how-can-i-estimate-relative-risk-using-glm-for-common-outcomes-in-cohort-studies/
+# tung chose log-binomial regression model instead of the "Poisson regression with robust error variance"
