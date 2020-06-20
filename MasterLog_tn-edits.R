@@ -14,7 +14,7 @@ if (!require("maps")) install.packages("maps")
 if (!require("mapdata")) install.packages("mapdata")
 
 ### Loading packages
-#library(ggpubr); library(tidyverse); library(forestplot)
+library(ggpubr); library(tidyverse); library(forestplot)
 
 ### Setting working directory for Github repo
 setwd('~/Documents/GitHub/ProjectSnafu')
@@ -32,12 +32,12 @@ AvgZscorePriceIndex = ppe_meta %>%
   summarize(avg_zscore_price_index = mean(zscore_price, na.rm = TRUE), 
             median_zscore_price_index = median(zscore_price, na.rm = TRUE)) %>% 
   left_join(ppe_meta, by = "id") %>% 
-  select(id = id, county = county, name = name, type = type, location = location, avg_zscore_price_index, median_zscore_price_index) %>% 
+  select(id = id, county = county, name = name, type = type, location = location, avg_zscore_price_index, median_zscore_price_index, pop_density, pop_total, case_rate_june19, case_rate_two_weeks_prior) %>% 
   unique()
 
 # Making combined file of ppe and avg price
 small_PI_table = AvgZscorePriceIndex %>% 
-  select(id, avg_zscore_price_index, median_zscore_price_index)
+  select(id, avg_zscore_price_index, median_zscore_price_index, pop_density, pop_total, case_rate_june19, case_rate_two_weeks_prior)
 ppe_obs = read.csv("InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1.csv", stringsAsFactors = FALSE) %>% 
   filter(type=="grocery") %>% 
   left_join(small_PI_table, by = "id")
@@ -116,12 +116,7 @@ merged$gender = fct_relevel(merged$gender, ref = "Male")
 merged$age = fct_relevel(merged$age, levels = c("c", "y", "a", "e"))
 
 merged$age = droplevels(merged$age)
-print(dim(merged))
 
-merged$mask = as.factor(merged$mask)
-class(merged$mask)
-
-str(merged)
 
 #merged[merged$county=="kenosha","case_rate"] = 756
 
@@ -182,7 +177,35 @@ test = merged
 
 # regular show: actual block ####
 # Running the logistic regression
-model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
+
+#Grahing potential effect of interaction term
+merged_top5_marker <- merged %>% 
+  mutate(Top5 = case_when(
+    county %in% c("dane", "brown", "racine", "outagamie", "winnebago", "milwaukee", "kenosha") ~ "Top5",
+         TRUE ~ "Not top 5"))
+
+
+merged_top5_marker %>% 
+  group_by(county) %>% 
+  summarize(percentage_wearing_mask = sum(mask)/n()*100) %>% 
+  right_join(merged_top5_marker, by = "county") %>% 
+  ggplot(aes(x = case_rate_two_weeks_prior, y = percentage_wearing_mask, color = pop_total, label = county)) + 
+  facet_wrap(~Top5) + 
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) + 
+  scale_color_gradient(low = "grey", high = "blue", na.value = NA) +
+  geom_text(aes(label=county))
+ggsave("./interaction_term_caserate_pop_total.png")
+
+
+
+#top 5
+# merged_top5 <- merged %>% 
+#   filter(county %in% c("dane", "brown", "racine", "outagamie", "winnebago"))
+# merged_nottop5 <- merged %>% 
+#   filter(!(county %in% c("dane", "brown", "racine", "outagamie", "winnebago")))
+model = glm(mask ~ age + avg_zscore_price_index + gender +case_rate*pop_total, data = merged, family = binomial)
+
 summary(model)
 
 # Converting logistic regression coef. into adjusted OR
@@ -356,3 +379,91 @@ dev.off()
 # some resources for how tung modeled this code:
 # https://stats.idre.ucla.edu/stata/faq/how-can-i-estimate-relative-risk-using-glm-for-common-outcomes-in-cohort-studies/
 # tung chose log-binomial regression model instead of the "Poisson regression with robust error variance"
+
+######Robust poisson model for calculation of RR########
+library(robust)
+library(robustbase)
+
+#merged$age <- as.character(merged$age)
+#merged$gender <- as.character(merged$gender)
+#class(merged$age)
+class(merged$mask)
+merged_new <- merged
+merged_new$mask <- as.numeric(merged_new$mask)
+class(merged_new$age)
+model1 = glmrob(mask ~ age_two_bins + avg_zscore_price_index + gender + case_rate, data = merged_new,
+                   family = "poisson")
+summary(model1)
+
+model2 = glmRob(mask ~ age_two_bins + avg_zscore_price_index + gender + case_rate, data = merged_new,
+                family = "poisson")
+summary(model2)
+
+OR1 = data.frame(exp(cbind("Odds ratio" = coef(model1), confint.default(model1, level = 0.95))), pvalue = summary(model1)$coefficients[,4], check.names = F)
+OR1
+
+OR2 = data.frame(exp(cbind("Odds ratio" = coef(model2))), pvalue = summary(model2)$coefficients[,4], check.names = F)
+OR2
+
+coef(model2)
+
+# ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
+set.seed(123)
+#coefini = coef(glm(mask ~ gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log")))
+#modelRR = glm(mask ~ age + gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log"), start=c(coefini,0,0,0))
+summary(modelRR)
+exp(coef(modelRR))
+
+model = modelRR
+
+RR = data.frame(exp(cbind("Relative risk" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
+RR
+
+RR = RR[c("agey","agea","agee","avg_zscore_price_index","genderFemale","case_rate"),]
+
+abbreviated_1 = RR[,1]
+abbreviated_2 = RR[,2]
+abbreviated_3 = RR[,3]
+abbreviated_4 = RR[,4]
+
+
+tabletext=cbind(
+  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
+  c("aRR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
+  c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
+  c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
+  c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
+tabletext
+png("forestplot_RR.png", width = 2400, height = 980)
+forestplot(labeltext = tabletext, 
+           mean = c(NA, abbreviated_1), 
+           lower = c(NA, abbreviated_2), 
+           upper = c(NA, abbreviated_3), 
+           ci.vertices = T,
+           is.summary = c(TRUE, rep(FALSE, 7)),
+           fn.ci_norm = fpDrawCircleCI, 
+           boxsize = 0.3,
+           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
+           xlab = " ",
+           lwd.ci = 6,
+           xlog = TRUE,
+           #xticks = c(0, 1, 2, 3, 4, 5, 6),
+           hrzl_lines = gpar(col = "#444444"),
+           linesheight = "lines", 
+           new_page = FALSE,
+           col = fpColors(box = c("black"), lines = "black"))
+dev.off()
+
+############
+#Section looking at effect of masks on future covid growth
+
+merged_growth <- merged %>% 
+  mutate(diff = (case_rate_june19-case_rate)) %>% 
+  group_by(county, date) %>% 
+  summarize(percentage_mask_wearing = sum(mask)/n()*100, diff, pop_total) %>% unique()
+
+incidence_model <- glm(diff ~ percentage_mask_wearing + pop_total, data = merged_growth)
+summary(incidence_model)
+cor(merged_growth$percentage_mask_wearing, merged_growth$diff)
+plot(merged_growth$pop_total, merged_growth$diff)
+plot(merged_growth$percentage_mask_wearing, merged_growth$diff)
