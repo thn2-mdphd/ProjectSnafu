@@ -14,7 +14,7 @@ if (!require("maps")) install.packages("maps")
 if (!require("mapdata")) install.packages("mapdata")
 
 ### Loading packages
-library(ggpubr); library(tidyverse); library(forestplot)
+library(ggpubr); library(tidyverse); library(forestplot); library(maps); library(mapdata); library(ggmap); library(tidyverse)
 
 ### Setting working directory for Github repo
 setwd('~/Documents/GitHub/ProjectSnafu')
@@ -57,6 +57,8 @@ old_age_to_new_age_mapping = data.frame(age = c("a", "e", "y", "c", "t"),
                                          age_two_bins = c("30+", "30+", "0-29", "0-29", "0-29")) # 2-bin age not used for analysis
 merged = merged %>% left_join(old_age_to_new_age_mapping, by = "age")
 hist(merged$avg_zscore_price_index)
+merged$pop_total <- merged$pop_total/10000
+merged$case_rate <- merged$case_rate/10
 write.csv(merged, "InputData/meta_merged_observed.csv")
 
 
@@ -179,29 +181,25 @@ test = merged
 # Running the logistic regression
 
 #Grahing potential effect of interaction term
-merged_top5_marker <- merged %>% 
-  mutate(Top5 = case_when(
-    county %in% c("dane", "brown", "racine", "outagamie", "winnebago", "milwaukee", "kenosha") ~ "Top5",
-         TRUE ~ "Not top 5"))
 
-
-merged_top5_marker %>% 
-  group_by(county) %>% 
-  summarize(percentage_wearing_mask = sum(mask)/n()*100) %>% 
-  right_join(merged_top5_marker, by = "county") %>% 
-  ggplot(aes(x = case_rate_two_weeks_prior, y = percentage_wearing_mask, color = pop_total, label = county)) + 
-  facet_wrap(~Top5) + 
-  geom_point() +
-  geom_smooth(method = lm, se = FALSE) + 
-  scale_color_gradient(low = "grey", high = "blue", na.value = NA) +
-  geom_text(aes(label=county))
-ggsave("./interaction_term_caserate_pop_total.png")
+# merged_top5_marker %>% 
+#   group_by(county) %>% 
+#   summarize(percentage_wearing_mask = sum(mask)/n()*100) %>% 
+#   right_join(merged_top5_marker, by = "county") %>% 
+#   ggplot(aes(x = case_rate_two_weeks_prior, y = percentage_wearing_mask, color = pop_total, label = county)) + 
+#   facet_wrap(~Top5) + 
+#   geom_point() +
+#   geom_smooth(method = lm, se = FALSE) + 
+#   scale_color_gradient(low = "grey", high = "blue", na.value = NA) +
+#   geom_text(aes(label=county))
+# ggsave("./interaction_term_caserate_pop_total.png")
 
 
 
 #top 5
-# merged_top5 <- merged %>% 
-#   filter(county %in% c("dane", "brown", "racine", "outagamie", "winnebago"))
+merged_top5 <- merged %>% 
+   filter(county %in% c("dane", "brown", "racine", "outagamie", "winnebago"))
+cor(merged_top5$case_rate, merged_top5$pop_total)
 # merged_nottop5 <- merged %>% 
 #   filter(!(county %in% c("dane", "brown", "racine", "outagamie", "winnebago")))
 model = glm(mask ~ age + avg_zscore_price_index + gender +case_rate*pop_total, data = merged, family = binomial)
@@ -218,25 +216,27 @@ abbreviated_2 = OR[-1,2]
 abbreviated_3 = OR[-1,3]
 abbreviated_4 = OR[-1,4]
 
+
+
 # SECTION 4: Plot figure 1B for aOR ####
 tabletext=cbind(
-  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
+  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence/10K", "Large population/10K", "Case prevalence:population"),
   c("aOR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
   c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
   c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
   c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
 
 tabletext
-png("forestplot.png", width = 2400, height = 980)
+png("forestplot.png", width = 2600, height = 980)
 forestplot(labeltext = tabletext, 
            mean = c(NA, abbreviated_1), 
            lower = c(NA, abbreviated_2), 
            upper = c(NA, abbreviated_3), 
            ci.vertices = T,
-           is.summary = c(TRUE, rep(FALSE, 7)),
+           is.summary = c(TRUE, rep(FALSE, 9)),
            fn.ci_norm = fpDrawCircleCI, 
            boxsize = 0.3,
-           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
+           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3.6 ), label = gpar(cex =3.6)),
            xlab = " ",
            lwd.ci = 6,
            xlog = TRUE,
@@ -256,11 +256,6 @@ dev.off()
 #of graph called range, and names 
 #wisconsin= map_data('state','wisconsin',fill=FALSE, col=pallete())
 #head(wisconsin)
-
-library(ggmap)
-library(maps)
-library(mapdata)
-
 
 #pull state boundaries
 states= map_data("state")
@@ -293,7 +288,10 @@ observed_counties=observation_data%>%
 head(observed_counties) #make sure it has all the columns still
 
 library(RColorBrewer)
-
+library(maps)
+library(mapdata)
+library(ggplot2)
+library(tidyverse)
 #blank WI with no gridlines in background and fixed coordinates so increasing 
 #figure wont change dimensions
 WIoutline = ggplot(data = wisconsin, mapping = aes(x = long, y = lat, group = group)) + 
@@ -308,10 +306,10 @@ WImask = WIcounty + geom_polygon(aes(fill = `Face Covering Use (%)`), data = obs
 WImask
 
 # custom name for COVID Prevalence per 100,000
-observed_counties = observed_counties %>% rename(`COVID-19 Prevalence \n(per 100,000)` = `COVID-19 Prevalence \n(per 100K)`)
+observed_counties = observed_counties %>% rename(`COVID-19 Prevalence \n(per 10,000)` = `COVID-19 Prevalence \n(per 100K)`)
 
 #add in counties that we observed at outlined in red
-WIobserved = WImask + geom_polygon(aes(color = `COVID-19 Prevalence \n(per 100,000)`), data=observed_counties,
+WIobserved = WImask + geom_polygon(aes(color = `COVID-19 Prevalence \n(per 10,000)`), data=observed_counties,
                                    fill=NA, size = 1) + scale_color_distiller(palette = "RdYlBu")
   #geom_polygon(color='black',fill=NA)
 WIobserved + theme(legend.key.size = unit(.75, "cm"),
