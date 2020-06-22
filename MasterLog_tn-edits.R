@@ -118,6 +118,7 @@ merged$age = fct_relevel(merged$age, levels = c("c", "y", "a", "e"))
 merged$age = droplevels(merged$age)
 print(dim(merged))
 
+<<<<<<< Updated upstream
 merged$mask = as.factor(merged$mask)
 class(merged$mask)
 
@@ -183,7 +184,64 @@ test = merged
 # regular show: actual block ####
 # Running the logistic regression
 model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
+=======
+test = merged
+
+#Grahing potential effect of interaction term
+merged_top5_marker <- merged %>% 
+  mutate(Top5 = case_when(
+    county %in% c("dane", "brown", "racine", "outagamie", "winnebago", "milwaukee", "kenosha") ~ "Top5",
+         TRUE ~ "Not top 5"))
+
+
+merged_top5_marker %>% 
+  group_by(county) %>% 
+  summarize(percentage_wearing_mask = sum(mask)/n()*100) %>% 
+  right_join(merged_top5_marker, by = "county") %>% 
+  ggplot(aes(x = case_rate_two_weeks_prior, y = percentage_wearing_mask, color = pop_total, label = county)) + 
+  facet_wrap(~Top5) + 
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) + 
+  scale_color_gradient(low = "grey", high = "blue", na.value = NA) +
+  geom_text(aes(label=county))
+ggsave("./interaction_term_caserate_pop_total.png")
+
+
+
+#top 5
+# merged_top5 <- merged %>% 
+#   filter(county %in% c("dane", "brown", "racine", "outagamie", "winnebago"))
+# merged_nottop5 <- merged %>% 
+#   filter(!(county %in% c("dane", "brown", "racine", "outagamie", "winnebago")))
+
+
+
+
+
+model = glm(mask ~ age + avg_zscore_price_index + gender +case_rate*pop_total, data = merged, family = binomial)
+>>>>>>> Stashed changes
 summary(model)
+
+
+install.packages("glmulti")
+library(glmulti)
+
+merged_test = merged
+
+merged_test = merged[,c("location","mask","gender","age","time",
+                       "no_cases","case_rate","avg_zscore_price_index","pop_density","pop_total")]
+View(merged_test)
+test_model = glmulti(mask ~., data = merged_test,
+                     level = 1,               # No interaction considered
+                     method = "h",            # Exhaustive approach
+                     crit = "aic",            # AIC as criteria
+                     confsetsize = 5,         # Keep 5 best models
+                     plotty = F, report = F,  # No plot or interim reports
+                     fitfunction = "glm",     # glm function
+                     family = binomial)       # binomial family for logistic regression
+          
+test_model@objects[[1]]
+
 
 # Converting logistic regression coef. into adjusted OR
 OR = data.frame(exp(cbind("Odds ratio" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
@@ -225,6 +283,7 @@ forestplot(labeltext = tabletext,
 dev.off()
 
 
+<<<<<<< Updated upstream
 ######### RELATIVE RISK June 18 TN #####
 model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
 # ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
@@ -285,6 +344,9 @@ dev.off()
 
 
 ##Generating map figure
+=======
+##Generating map figure #######
+>>>>>>> Stashed changes
 
 
 
