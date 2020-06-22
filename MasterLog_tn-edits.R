@@ -198,8 +198,8 @@ test = merged
 
 #top 5
 merged_top5 <- merged %>% 
-   filter(county %in% c("dane", "brown", "racine", "outagamie", "winnebago"))
-cor(merged_top5$case_rate, merged_top5$pop_total)
+   filter(county %in% c("dane", "brown", "racine", "kenosha", "milwaukee"))
+
 # merged_nottop5 <- merged %>% 
 #   filter(!(county %in% c("dane", "brown", "racine", "outagamie", "winnebago")))
 model = glm(mask ~ age + avg_zscore_price_index + gender +case_rate*pop_total, data = merged, family = binomial)
@@ -245,6 +245,7 @@ forestplot(labeltext = tabletext,
            linesheight = "lines", 
            new_page = FALSE,
            col = fpColors(box = c("black"), lines = "black"))
+
 dev.off()
 
 
