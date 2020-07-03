@@ -20,7 +20,7 @@ library(ggpubr); library(tidyverse); library(forestplot); library(maps); library
 setwd('~/Documents/GitHub/ProjectSnafu')
 
 # SECTION 1: Generate Price Index AND combine into observation table ####
-ppe_meta = read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv", stringsAsFactors = FALSE)
+ppe_meta = read.csv("InputData/20-0703-ppe_meta_data.csv", stringsAsFactors = FALSE)
 ppe_meta = ppe_meta %>% filter(type=="grocery")
 str(ppe_meta)
 ppe_meta$price_of_good = as.numeric(ppe_meta$price_of_good)
@@ -32,13 +32,13 @@ AvgZscorePriceIndex = ppe_meta %>%
   summarize(avg_zscore_price_index = mean(zscore_price, na.rm = TRUE), 
             median_zscore_price_index = median(zscore_price, na.rm = TRUE)) %>% 
   left_join(ppe_meta, by = "id") %>% 
-  select(id = id, county = county, name = name, type = type, location = location, avg_zscore_price_index, median_zscore_price_index, pop_density, pop_total, case_rate_june19, case_rate_two_weeks_prior) %>% 
+  select(id = id, county = county, name = name, type = type, location = location, avg_zscore_price_index, median_zscore_price_index, pop_total) %>% 
   unique()
 
 # Making combined file of ppe and avg price
 small_PI_table = AvgZscorePriceIndex %>% 
-  select(id, avg_zscore_price_index, median_zscore_price_index, pop_density, pop_total, case_rate_june19, case_rate_two_weeks_prior)
-ppe_obs = read.csv("InputData/ppe_observation_data - CURRENT - ppe_observation_data - Sheet1.csv", stringsAsFactors = FALSE) %>% 
+  select(id, avg_zscore_price_index, median_zscore_price_index, pop_total)
+ppe_obs = read.csv("InputData/20-0703-ppe_observation_data.csv", stringsAsFactors = FALSE) %>% 
   filter(type=="grocery") %>% 
   left_join(small_PI_table, by = "id")
 
@@ -57,8 +57,11 @@ old_age_to_new_age_mapping = data.frame(age = c("a", "e", "y", "c", "t"),
                                          age_two_bins = c("30+", "30+", "0-29", "0-29", "0-29")) # 2-bin age not used for analysis
 merged = merged %>% left_join(old_age_to_new_age_mapping, by = "age")
 hist(merged$avg_zscore_price_index)
-merged$pop_total <- merged$pop_total/10000
-merged$case_rate <- merged$case_rate/10
+
+case_prevalence_map = ppe_meta %>% select(id, case_rate, no_cases) %>% unique()
+merged = merged %>% left_join(case_prevalence_map, by = "id")
+#merged$pop_total <- merged$pop_total/10000
+#merged$case_rate <- merged$case_rate/10
 write.csv(merged, "InputData/meta_merged_observed.csv")
 
 
