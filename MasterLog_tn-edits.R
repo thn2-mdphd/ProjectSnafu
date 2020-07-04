@@ -205,6 +205,7 @@ merged_top5 <- merged %>%
 
 # merged_nottop5 <- merged %>% 
 #   filter(!(county %in% c("dane", "brown", "racine", "outagamie", "winnebago")))
+merged$pop_total = merged$pop_total/10000
 model = glm(mask ~ age + avg_zscore_price_index + gender +case_rate*pop_total, data = merged, family = binomial)
 
 summary(model)
@@ -330,6 +331,7 @@ ggsave("Fig1A.png")
 
 
 ######### RELATIVE RISK June 18 TN #####
+View(merged)
 model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
 # ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
 set.seed(123)
