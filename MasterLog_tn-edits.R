@@ -17,10 +17,10 @@ if (!require("mapdata")) install.packages("mapdata")
 library(ggpubr); library(tidyverse); library(forestplot); library(maps); library(mapdata); library(ggmap); library(tidyverse)
 
 ### Setting working directory for Github repo
-setwd('~/Documents/GitHub/ProjectSnafu')
+setwd('~/Documents/GitHub/ProjectSnafu/')
 
 # SECTION 1: Generate Price Index AND combine into observation table ####
-ppe_meta = read.csv("InputData/20-0703-ppe_meta_data.csv", stringsAsFactors = FALSE)
+ppe_meta = read.csv("InputData/20-0708-ppe_meta_data.csv", stringsAsFactors = FALSE)
 ppe_meta = ppe_meta %>% filter(type=="grocery")
 str(ppe_meta)
 ppe_meta$price_of_good = as.numeric(ppe_meta$price_of_good)
@@ -38,7 +38,7 @@ AvgZscorePriceIndex = ppe_meta %>%
 # Making combined file of ppe and avg price
 small_PI_table = AvgZscorePriceIndex %>% 
   select(id, avg_zscore_price_index, median_zscore_price_index, pop_total)
-ppe_obs = read.csv("InputData/20-0703-ppe_observation_data.csv", stringsAsFactors = FALSE) %>% 
+ppe_obs = read.csv("InputData/20-0708-ppe_observation_data.csv", stringsAsFactors = FALSE) %>% 
   filter(type=="grocery") %>% 
   left_join(small_PI_table, by = "id")
 
@@ -199,7 +199,7 @@ test = merged
 
 
 
-#top 5
+#top 5, not used
 merged_top5 <- merged %>% 
    filter(county %in% c("dane", "brown", "racine", "kenosha", "milwaukee"))
 
@@ -321,7 +321,7 @@ WIobserved + theme(legend.key.size = unit(.75, "cm"),
                    legend.title = element_text(size = 16),
                    legend.text = element_text(size = 14))
 
-ggsave("Fig1A.png")
+ggsave("Fig1A.png", width = 2400, height = 980)
 
 
 ##NOTE TO TUNG: should have two files saved in root. One is Fig1A.png and the other is forestplot.png. 
@@ -329,8 +329,9 @@ ggsave("Fig1A.png")
 #To change "COVID-19 Prevalence" title, change line 253. Remember to change all subsequent references to that variable name.
 
 
+######## EVERYTHING BELOW IS NOT USED ######################
 
-######### RELATIVE RISK June 18 TN #####
+######### RELATIVE RISK June 18 TN, **** NOT USED **** #####
 View(merged)
 model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
 # ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
@@ -384,8 +385,8 @@ dev.off()
 # https://stats.idre.ucla.edu/stata/faq/how-can-i-estimate-relative-risk-using-glm-for-common-outcomes-in-cohort-studies/
 # tung chose log-binomial regression model instead of the "Poisson regression with robust error variance"
 
-######Robust poisson model for calculation of RR########
-library(robust)
+###### Robust poisson model (alternative method to the above section) for calculation of RR, not not used ########
+#library(robust)
 library(robustbase)
 
 #merged$age <- as.character(merged$age)

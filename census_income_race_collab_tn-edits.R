@@ -25,7 +25,7 @@ census_race <- read.csv("InputData/ACSDP5Y2018.DP05_data_with_overlays_2020-05-2
 View(census_race)
 
 # Read in Meta data
-geo_id_data <- read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv") %>% select(id, geo_id) %>% unique()
+geo_id_data <- read.csv("InputData/20-0708-ppe_meta_data.csv") %>% select(id, geo_id) %>% unique()
 
 # Read in Observational data
 ppe_meta <- read.csv("InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
