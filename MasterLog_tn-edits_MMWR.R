@@ -20,7 +20,7 @@ library(ggpubr); library(tidyverse); library(forestplot); library(maps); library
 setwd('~/Documents/GitHub/ProjectSnafu')
 
 # SECTION 1: Generate Price Index AND combine into observation table ####
-ppe_meta = read.csv("InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv", stringsAsFactors = FALSE)
+ppe_meta = read.csv("./InputData/ppe_meta_data.csv - CURRENT - ppe_meta_data.csv - Sheet1.csv", stringsAsFactors = FALSE)
 ppe_meta = ppe_meta %>% filter(type=="grocery")
 str(ppe_meta)
 ppe_meta$price_of_good = as.numeric(ppe_meta$price_of_good)
@@ -61,35 +61,15 @@ merged$pop_total <- merged$pop_total/10000
 merged$case_rate <- merged$case_rate/10
 write.csv(merged, "InputData/meta_merged_observed.csv")
 
-
-# SECTION 2: Generate TABLE 1 ####
-
-table1_names = merged %>% group_by(county) %>% summarize(n = n(), mask_usage = paste0(c(sum(mask),"/", n(), " (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-  unite(name, county:n, sep = ", n = ", remove = FALSE)
-table1_names
-
-table1_gender = merged %>% group_by(county, gender) %>% summarize(mask_usage = paste0(c(sum(mask), "/", n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-  pivot_wider(names_from = gender, values_from = mask_usage)
-table1_gender
-
-table1_age = merged %>% group_by(county, age) %>% summarize(mask_usage = paste0(c(sum(mask), "/", n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-  pivot_wider(names_from = age, values_from = mask_usage)
-table1_age
-
-table1_price_index = merged %>% group_by(county) %>% summarize(max_PI = round(max(avg_zscore_price_index, na.rm = TRUE), 1), 
-                                                               min_PI = round(min(avg_zscore_price_index, na.rm = TRUE), 1)) %>% unite(range, min_PI:max_PI, sep = "," )
-table1_price_index
-table1_case_rate = merged %>% select(county, case_rate, no_cases) %>% 
-  unique()
-table1_case_rate
-
-#! TN October 30, 2020
-
-
+#Tung's edits from Oct 30th - some individuals with homemade masks did not have mask box checked
 merged %>% filter(homeade == 1, mask == 0 ) # oops looks like there was a mistake at places
 
 merged_new = merged
 merged_new[which(merged_new$homeade == 1 & merged_new$mask == 0),"mask"] = 1
+write.csv(merged_new, "InputData/meta_merged_observed_Oct31correction.csv")
+
+# SECTION 2: Generate non-dane county table ####
+merged <- read.csv("InputData/meta_merged_observed_Oct31correction.csv")
 
 table1_new_names = merged_new %>% group_by(county) %>% summarize(n = n(), mask_usage = paste0(c(sum(mask),"/", n(), " (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
   unite(name, county:n, sep = ", n = ", remove = FALSE)
@@ -115,80 +95,40 @@ new_table1 = table1_new_names %>% left_join(table1_new_gender, by = "county") %>
 View(new_table1)
 write.csv(new_table1, file="new_table1.csv")
 
-
-
-#!
-table1_case_rate$combined = paste0(table1_case_rate$case_rate, " (", table1_case_rate$no_cases, ")")
-table1_case_rate = table1_case_rate %>% select(county, combined) %>% # note that i took the first occurence of dane, so the higher case rate
-  arrange(county, desc(combined)) %>% distinct(county, .keep_all=TRUE)
-table1_case_rate
-
-## Finally, make a total row for bottom of table, as 1 row dataframe
-total = cbind("Wisconsin", "Total", merged %>% 
-                summarize(n = n(), mask_usage = paste0(c(sum(mask),"/",n(), " (", round(sum(mask)/n()*100, 1), ")"), collapse = "")),
-  merged %>% group_by(gender) %>% summarize(mask_usage = paste0(c(sum(mask), "/",n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-    pivot_wider(names_from = gender, values_from = mask_usage),
-  merged %>% group_by(age) %>% summarize(mask_usage = paste0(c(sum(mask), "/",n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-    pivot_wider(names_from = age, values_from = mask_usage), 
-  merged %>% summarize(homemade_mask_usage = paste0(c(sum(homeade), "/", sum(mask)," (", round(sum(homeade)/sum(mask)*100, 1), ")"), collapse = "")), 0)
-ncol(total)
-
-## Setup the final Data Frame
-table1 = table1_names %>% left_join(table1_gender, by = "county") %>% left_join(table1_age, by = "county") %>% 
-  left_join(table1_price_index, by = "county") %>% left_join(table1_case_rate, by = "county")
-colnames(total) = colnames(table1)
-final_table1 = rbind(table1, total) # combine main table with total row
-View(final_table1)
-
-## Write out the Table 1 for Publication
-write.table(final_table1, "Demographics/table.txt", sep="\t", quote=F, row.names=F)
-
-
-
-
-
-##SECTION 2A. Dane county store specific table
+##SECTION 2B: Emma added Oct 31 - Dane county store specific table
+merged <- read.csv("InputData/meta_merged_observed_Oct31correction.csv")
 merged_dane <- merged %>% filter(county=="dane")
 table1_names = merged_dane %>% group_by(id) %>% summarize(n = n(), mask_usage = paste0(c(sum(mask),"/", n(), " (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
   unite(name, id:n, sep = ", n = ", remove = FALSE)
 table1_names
 
-table1_homemade = merged_dane %>% group_by(id) %>% summarize(homemade_mask_usage = paste0(c(sum(homeade), "/", sum(mask)," (", round(sum(homeade)/sum(mask)*100, 1), ")"), collapse = "")) #%>% 
-  #pivot_wider(names_from = gender, values_from = mask_usage)
-table1_homemade
-
 table1_gender = merged_dane %>% group_by(id, gender) %>% summarize(mask_usage = paste0(c(sum(mask), "/", n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
   pivot_wider(names_from = gender, values_from = mask_usage)
 table1_gender
 
-table1_age = merged %>% group_by(id, age) %>% summarize(mask_usage = paste0(c(sum(mask), "/", n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
+table1_age = merged_dane %>% group_by(id, age) %>% summarize(mask_usage = paste0(c(sum(mask), "/", n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
   pivot_wider(names_from = age, values_from = mask_usage)
 table1_age
 
 ## Finally, make a total row for bottom of table, as 1 row dataframe
 total_dane = cbind("Dane", "Total", merged_dane %>% 
-                summarize(n = n(), mask_usage = paste0(c(sum(mask),"/",n(), " (", round(sum(mask)/n()*100, 1), ")"), collapse = "")),
-              merged_dane %>% group_by(gender) %>% summarize(mask_usage = paste0(c(sum(mask), "/",n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-                pivot_wider(names_from = gender, values_from = mask_usage),
-              merged_dane %>% group_by(age) %>% summarize(mask_usage = paste0(c(sum(mask), "/",n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
-                pivot_wider(names_from = age, values_from = mask_usage), 
-              merged_dane %>% summarize(homemade_mask_usage = paste0(c(sum(homeade), "/", sum(mask)," (", round(sum(homeade)/sum(mask)*100, 1), ")"), collapse = "")))
-ncol(total)
+                     summarize(n = n(), mask_usage = paste0(c(sum(mask),"/",n(), " (", round(sum(mask)/n()*100, 1), ")"), collapse = "")),
+                   merged_dane %>% group_by(gender) %>% summarize(mask_usage = paste0(c(sum(mask), "/",n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
+                     pivot_wider(names_from = gender, values_from = mask_usage),
+                   merged_dane %>% group_by(age) %>% summarize(mask_usage = paste0(c(sum(mask), "/",n()," (", round(sum(mask)/n()*100, 1), ")"), collapse = "")) %>% 
+                     pivot_wider(names_from = age, values_from = mask_usage))
+names(total_dane) <- c("name", "id", "n", "mask usage", "Males", "Females", "Adult", "Child", "Older adult", "Young adult")
 
-total_dane
 ## Setup the final Data Frame
 table1 = table1_names %>% left_join(table1_gender, by = "id") %>% left_join(table1_age, by = "id")
-colnames(total_dane) = colnames(table1)
-final_table1 = rbind(table1, total_dane) %>% select(-name) # combine main table with total row
+names(table1) <- names(total_dane)
+final_table1 = rbind(table1, total_dane) %>% select(-name) %>% 
+  select(id, n, Males, Females, Child, `Young adult`, Adult, `Older adult`)# combine main table with total row
 View(final_table1)
-write.csv(final_table1, "../../MMWR/table_dane_age_gender.csv")
-
-
-
-
+write.csv(final_table1, "./InputData/table_dane_age_gender.csv")
 
 # SECTION 3: Logistic Regression and Odds Ratios ####
-merged = read.csv("InputData/meta_merged_observed.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+merged = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
   filter(county=="dane")
 merged$gender = as.factor(recode(merged$gender, `0` = "Male", `1` = "Female"))
 merged$gender = fct_relevel(merged$gender, ref = "Male")
@@ -200,37 +140,37 @@ merged$age = fct_relevel(merged$age, levels = c("a", "y", "c", "e"))
 merged$age = droplevels(merged$age)
 
 
-#merged[merged$county=="kenosha","case_rate"] = 756
-
-# Setting threshold for high case rate vs low case rate
-threshold = 800
-
-plot(density(merged$case_rate))
-abline(v=threshold,col="red")
-
-test = merged
-
-# #test = merged %>% group_by(county) %>% select(county, case_rate) %>% unique()
-# #plot(density(test$case_rate))
-# #abline(v=threshold,col="red")
-# sum(test$case_rate > threshold) # 4: milwaukee, racine, brown and kenosha - large urban centers
-# sum(test$case_rate < threshold) # 17: including dane (urban, but different: high mask, low prevalence) twice for different days, so total of 20
+# #merged[merged$county=="kenosha","case_rate"] = 756
 # 
-# # expand now to all observations, not county
-# #test = merged$case_rate
-# sum(test > threshold) # 613 observations in high prevalence
-# sum(test < threshold) # 2658 observations in low prevalence
+# # Setting threshold for high case rate vs low case rate
+# threshold = 800
 # 
-# # Threshold is set OK
-# merged = merged %>% mutate(severity = case_when(
-#   case_rate < threshold ~ 0,
-#   case_rate >= threshold ~ 1
-# ))
+# plot(density(merged$case_rate))
+# abline(v=threshold,col="red")
 # 
-# # side show: scratch block ####
-# test = test %>% mutate(severity = case_when(
-#   case_rate < threshold ~ 0,
-#   case_rate >= threshold ~ 1
+# test = merged
+# 
+# # #test = merged %>% group_by(county) %>% select(county, case_rate) %>% unique()
+# # #plot(density(test$case_rate))
+# # #abline(v=threshold,col="red")
+# # sum(test$case_rate > threshold) # 4: milwaukee, racine, brown and kenosha - large urban centers
+# # sum(test$case_rate < threshold) # 17: including dane (urban, but different: high mask, low prevalence) twice for different days, so total of 20
+# # 
+# # # expand now to all observations, not county
+# # #test = merged$case_rate
+# # sum(test > threshold) # 613 observations in high prevalence
+# # sum(test < threshold) # 2658 observations in low prevalence
+# # 
+# # # Threshold is set OK
+# # merged = merged %>% mutate(severity = case_when(
+# #   case_rate < threshold ~ 0,
+# #   case_rate >= threshold ~ 1
+# # ))
+# # 
+# # # side show: scratch block ####
+# # test = test %>% mutate(severity = case_when(
+# #   case_rate < threshold ~ 0,
+# #   case_rate >= threshold ~ 1
 # ))
 # 
 # merged$severity = as.factor(merged$severity)
@@ -342,251 +282,251 @@ se <- sqrt(diag(vcov(mixed_effects_homemade_a)))
                          se))
 exp(tab_homemade)
 summary(mixed_effects_homemade_a)
-# SECTION 4: Plot figure 1B for aOR ####
-tabletext=cbind(
-  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence/10K", "Large population/10K", "Case prevalence:population"),
-  c("aOR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
-  c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
-  c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
-  c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
-
-tabletext
-png("forestplot.png", width = 2600, height = 980)
-forestplot(labeltext = tabletext, 
-           mean = c(NA, abbreviated_1), 
-           lower = c(NA, abbreviated_2), 
-           upper = c(NA, abbreviated_3), 
-           ci.vertices = T,
-           is.summary = c(TRUE, rep(FALSE, 9)),
-           fn.ci_norm = fpDrawCircleCI, 
-           boxsize = 0.3,
-           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3.6 ), label = gpar(cex =3.6)),
-           xlab = " ",
-           lwd.ci = 6,
-           xlog = TRUE,
-           #xticks = c(0, 1, 2, 3, 4, 5, 6),
-           hrzl_lines = gpar(col = "#444444"),
-           linesheight = "lines", 
-           new_page = FALSE,
-           col = fpColors(box = c("black"), lines = "black"))
-
-dev.off()
-
-
-##Generating map figure
-
-
-
-#state of WI boundary and is saved as a list with x,y,coordinates
-#of graph called range, and names 
-#wisconsin= map_data('state','wisconsin',fill=FALSE, col=pallete())
-#head(wisconsin)
-
-#pull state boundaries
-states= map_data("state")
-wisconsin=subset(states,region =='wisconsin')
-
-#add in county lines
-#column headers are: long,lat,group,order,region,subregion
-usa_counties=map_data('county')
-counties=subset(usa_counties,region=='wisconsin')
-counties$subregion = replace(counties$subregion, counties$subregion=="st croix", "st_croix")
-counties$subregion = replace(counties$subregion, counties$subregion=="fond du lac", "fond_du_lac")
-
-observation_data = read.csv("./InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
-  group_by(county) %>% 
-  summarize(`Face Covering Use (%)` = sum(mask, na.rm = TRUE)/n()*100, `COVID-19 Prevalence \n(per 100K)` = mean(case_rate, na.rm = TRUE)) %>% 
-  unique() %>% 
-  left_join(counties, by = c("county" = "subregion")) %>% unique() 
-
-#counties we observed in
-#view the data to see which ones to pull
-
-#pull all rows with subregion of adams,brown,dane,grant,eau claire,green,iowa,
-#jackson,kenosha,lafayette,milwaukee,monroe, outagamie,st croix,pierce,polk,
-#rock, walworth, wood
-observed_counties=observation_data%>% 
-  filter(county %in% c('adams','brown','dane','grant','iowa',
-                       'jackson','kenosha','lafayette','milwaukee',
-                       'monroe','outagamie','st_croix','pierce','polk','walworth','wood','racine', 'winnebago', 'waushara','fond_du_lac'))
-
-head(observed_counties) #make sure it has all the columns still
-
-library(RColorBrewer)
-library(maps)
-library(mapdata)
-library(ggplot2)
-library(tidyverse)
-#blank WI with no gridlines in background and fixed coordinates so increasing 
-#figure wont change dimensions
-WIoutline = ggplot(data = wisconsin, mapping = aes(x = long, y = lat, group = group)) + 
-  coord_fixed(1.4) + geom_polygon(fill = "white", color = "black", size = 0.01)
-#add in the county lines with black outlines and safe as WIcounty
-WIoutline
-WIcounty = WIoutline+ theme_nothing(legend = TRUE) + geom_polygon(data=counties, fill = NA, color='black', size=0.05)+
-  geom_polygon(color='black', fill=NA, size = 0.05)
-WIcounty
-WImask = WIcounty + geom_polygon(aes(fill = `Face Covering Use (%)`), data = observed_counties) + 
-  scale_fill_distiller(palette = "Greys", direction = 1)
-WImask
-
-# custom name for COVID Prevalence per 100,000
-observed_counties = observed_counties %>% rename(`COVID-19 Prevalence \n(per 10,000)` = `COVID-19 Prevalence \n(per 100K)`)
-
-#add in counties that we observed at outlined in red
-WIobserved = WImask + geom_polygon(aes(color = `COVID-19 Prevalence \n(per 10,000)`), data=observed_counties,
-                                   fill=NA, size = 1) + scale_color_distiller(palette = "RdYlBu")
-  #geom_polygon(color='black',fill=NA)
-WIobserved + theme(legend.key.size = unit(.75, "cm"),
-                   legend.title = element_text(size = 16),
-                   legend.text = element_text(size = 14))
-
-ggsave("Fig1A.png")
-
-
-##NOTE TO TUNG: should have two files saved in root. One is Fig1A.png and the other is forestplot.png. 
-#Both plots go in figure_continuous.pptx file. X axis labels for forest plot are in ppt, so you can edit directly there. 
-#To change "COVID-19 Prevalence" title, change line 253. Remember to change all subsequent references to that variable name.
-
-
-
-######### RELATIVE RISK June 18 TN #####
-model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
-# ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
-set.seed(123)
-coefini = coef(glm(mask ~ gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log")))
-modelRR = glm(mask ~ age + gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log"), start=c(coefini,0,0,0))
-summary(modelRR)
-exp(coef(modelRR))
-
-model = modelRR
-
-RR = data.frame(exp(cbind("Relative risk" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
-RR
-
-RR = RR[c("agey","agea","agee","avg_zscore_price_index","genderFemale","case_rate"),]
-
-abbreviated_1 = RR[,1]
-abbreviated_2 = RR[,2]
-abbreviated_3 = RR[,3]
-abbreviated_4 = RR[,4]
-
-
-tabletext=cbind(
-  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
-  c("aRR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
-  c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
-  c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
-  c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
-tabletext
-png("forestplot_RR.png", width = 2400, height = 980)
-forestplot(labeltext = tabletext, 
-           mean = c(NA, abbreviated_1), 
-           lower = c(NA, abbreviated_2), 
-           upper = c(NA, abbreviated_3), 
-           ci.vertices = T,
-           is.summary = c(TRUE, rep(FALSE, 7)),
-           fn.ci_norm = fpDrawCircleCI, 
-           boxsize = 0.3,
-           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
-           xlab = " ",
-           lwd.ci = 6,
-           xlog = TRUE,
-           #xticks = c(0, 1, 2, 3, 4, 5, 6),
-           hrzl_lines = gpar(col = "#444444"),
-           linesheight = "lines", 
-           new_page = FALSE,
-           col = fpColors(box = c("black"), lines = "black"))
-dev.off()
-
-# some resources for how tung modeled this code:
-# https://stats.idre.ucla.edu/stata/faq/how-can-i-estimate-relative-risk-using-glm-for-common-outcomes-in-cohort-studies/
-# tung chose log-binomial regression model instead of the "Poisson regression with robust error variance"
-
-######Robust poisson model for calculation of RR########
-library(robust)
-library(robustbase)
-
-#merged$age <- as.character(merged$age)
-#merged$gender <- as.character(merged$gender)
-#class(merged$age)
-class(merged$mask)
-merged_new <- merged
-merged_new$mask <- as.numeric(merged_new$mask)
-class(merged_new$age)
-model1 = glmrob(mask ~ age_two_bins + avg_zscore_price_index + gender + case_rate, data = merged_new,
-                   family = "poisson")
-summary(model1)
-
-model2 = glmRob(mask ~ age_two_bins + avg_zscore_price_index + gender + case_rate, data = merged_new,
-                family = "poisson")
-summary(model2)
-
-OR1 = data.frame(exp(cbind("Odds ratio" = coef(model1), confint.default(model1, level = 0.95))), pvalue = summary(model1)$coefficients[,4], check.names = F)
-OR1
-
-OR2 = data.frame(exp(cbind("Odds ratio" = coef(model2))), pvalue = summary(model2)$coefficients[,4], check.names = F)
-OR2
-
-coef(model2)
-
-# ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
-set.seed(123)
-#coefini = coef(glm(mask ~ gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log")))
-#modelRR = glm(mask ~ age + gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log"), start=c(coefini,0,0,0))
-summary(modelRR)
-exp(coef(modelRR))
-
-model = modelRR
-
-RR = data.frame(exp(cbind("Relative risk" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
-RR
-
-RR = RR[c("agey","agea","agee","avg_zscore_price_index","genderFemale","case_rate"),]
-
-abbreviated_1 = RR[,1]
-abbreviated_2 = RR[,2]
-abbreviated_3 = RR[,3]
-abbreviated_4 = RR[,4]
-
-
-tabletext=cbind(
-  c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
-  c("aRR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
-  c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
-  c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
-  c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
-tabletext
-png("forestplot_RR.png", width = 2400, height = 980)
-forestplot(labeltext = tabletext, 
-           mean = c(NA, abbreviated_1), 
-           lower = c(NA, abbreviated_2), 
-           upper = c(NA, abbreviated_3), 
-           ci.vertices = T,
-           is.summary = c(TRUE, rep(FALSE, 7)),
-           fn.ci_norm = fpDrawCircleCI, 
-           boxsize = 0.3,
-           txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
-           xlab = " ",
-           lwd.ci = 6,
-           xlog = TRUE,
-           #xticks = c(0, 1, 2, 3, 4, 5, 6),
-           hrzl_lines = gpar(col = "#444444"),
-           linesheight = "lines", 
-           new_page = FALSE,
-           col = fpColors(box = c("black"), lines = "black"))
-dev.off()
-
-############
-#Section looking at effect of masks on future covid growth
-
-merged_growth <- merged %>% 
-  mutate(diff = (case_rate_june19-case_rate)) %>% 
-  group_by(county, date) %>% 
-  summarize(percentage_mask_wearing = sum(mask)/n()*100, diff, pop_total) %>% unique()
-
-incidence_model <- glm(diff ~ percentage_mask_wearing + pop_total, data = merged_growth)
-summary(incidence_model)
-cor(merged_growth$percentage_mask_wearing, merged_growth$diff)
-plot(merged_growth$pop_total, merged_growth$diff)
-plot(merged_growth$percentage_mask_wearing, merged_growth$diff)
+# # SECTION 4: Plot figure 1B for aOR ####
+# tabletext=cbind(
+#   c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence/10K", "Large population/10K", "Case prevalence:population"),
+#   c("aOR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
+#   c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
+#   c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
+#   c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
+# 
+# tabletext
+# png("forestplot.png", width = 2600, height = 980)
+# forestplot(labeltext = tabletext, 
+#            mean = c(NA, abbreviated_1), 
+#            lower = c(NA, abbreviated_2), 
+#            upper = c(NA, abbreviated_3), 
+#            ci.vertices = T,
+#            is.summary = c(TRUE, rep(FALSE, 9)),
+#            fn.ci_norm = fpDrawCircleCI, 
+#            boxsize = 0.3,
+#            txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3.6 ), label = gpar(cex =3.6)),
+#            xlab = " ",
+#            lwd.ci = 6,
+#            xlog = TRUE,
+#            #xticks = c(0, 1, 2, 3, 4, 5, 6),
+#            hrzl_lines = gpar(col = "#444444"),
+#            linesheight = "lines", 
+#            new_page = FALSE,
+#            col = fpColors(box = c("black"), lines = "black"))
+# 
+# dev.off()
+# 
+# 
+# ##Generating map figure
+# 
+# 
+# 
+# #state of WI boundary and is saved as a list with x,y,coordinates
+# #of graph called range, and names 
+# #wisconsin= map_data('state','wisconsin',fill=FALSE, col=pallete())
+# #head(wisconsin)
+# 
+# #pull state boundaries
+# states= map_data("state")
+# wisconsin=subset(states,region =='wisconsin')
+# 
+# #add in county lines
+# #column headers are: long,lat,group,order,region,subregion
+# usa_counties=map_data('county')
+# counties=subset(usa_counties,region=='wisconsin')
+# counties$subregion = replace(counties$subregion, counties$subregion=="st croix", "st_croix")
+# counties$subregion = replace(counties$subregion, counties$subregion=="fond du lac", "fond_du_lac")
+# 
+# observation_data = read.csv("./InputData/meta_merged_observed.csv", stringsAsFactors = FALSE) %>% 
+#   group_by(county) %>% 
+#   summarize(`Face Covering Use (%)` = sum(mask, na.rm = TRUE)/n()*100, `COVID-19 Prevalence \n(per 100K)` = mean(case_rate, na.rm = TRUE)) %>% 
+#   unique() %>% 
+#   left_join(counties, by = c("county" = "subregion")) %>% unique() 
+# 
+# #counties we observed in
+# #view the data to see which ones to pull
+# 
+# #pull all rows with subregion of adams,brown,dane,grant,eau claire,green,iowa,
+# #jackson,kenosha,lafayette,milwaukee,monroe, outagamie,st croix,pierce,polk,
+# #rock, walworth, wood
+# observed_counties=observation_data%>% 
+#   filter(county %in% c('adams','brown','dane','grant','iowa',
+#                        'jackson','kenosha','lafayette','milwaukee',
+#                        'monroe','outagamie','st_croix','pierce','polk','walworth','wood','racine', 'winnebago', 'waushara','fond_du_lac'))
+# 
+# head(observed_counties) #make sure it has all the columns still
+# 
+# library(RColorBrewer)
+# library(maps)
+# library(mapdata)
+# library(ggplot2)
+# library(tidyverse)
+# #blank WI with no gridlines in background and fixed coordinates so increasing 
+# #figure wont change dimensions
+# WIoutline = ggplot(data = wisconsin, mapping = aes(x = long, y = lat, group = group)) + 
+#   coord_fixed(1.4) + geom_polygon(fill = "white", color = "black", size = 0.01)
+# #add in the county lines with black outlines and safe as WIcounty
+# WIoutline
+# WIcounty = WIoutline+ theme_nothing(legend = TRUE) + geom_polygon(data=counties, fill = NA, color='black', size=0.05)+
+#   geom_polygon(color='black', fill=NA, size = 0.05)
+# WIcounty
+# WImask = WIcounty + geom_polygon(aes(fill = `Face Covering Use (%)`), data = observed_counties) + 
+#   scale_fill_distiller(palette = "Greys", direction = 1)
+# WImask
+# 
+# # custom name for COVID Prevalence per 100,000
+# observed_counties = observed_counties %>% rename(`COVID-19 Prevalence \n(per 10,000)` = `COVID-19 Prevalence \n(per 100K)`)
+# 
+# #add in counties that we observed at outlined in red
+# WIobserved = WImask + geom_polygon(aes(color = `COVID-19 Prevalence \n(per 10,000)`), data=observed_counties,
+#                                    fill=NA, size = 1) + scale_color_distiller(palette = "RdYlBu")
+#   #geom_polygon(color='black',fill=NA)
+# WIobserved + theme(legend.key.size = unit(.75, "cm"),
+#                    legend.title = element_text(size = 16),
+#                    legend.text = element_text(size = 14))
+# 
+# ggsave("Fig1A.png")
+# 
+# 
+# ##NOTE TO TUNG: should have two files saved in root. One is Fig1A.png and the other is forestplot.png. 
+# #Both plots go in figure_continuous.pptx file. X axis labels for forest plot are in ppt, so you can edit directly there. 
+# #To change "COVID-19 Prevalence" title, change line 253. Remember to change all subsequent references to that variable name.
+# 
+# 
+# 
+# ######### RELATIVE RISK June 18 TN #####
+# model = glm(mask ~ age + avg_zscore_price_index + gender + case_rate, data = merged, family = binomial)
+# # ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
+# set.seed(123)
+# coefini = coef(glm(mask ~ gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log")))
+# modelRR = glm(mask ~ age + gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log"), start=c(coefini,0,0,0))
+# summary(modelRR)
+# exp(coef(modelRR))
+# 
+# model = modelRR
+# 
+# RR = data.frame(exp(cbind("Relative risk" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
+# RR
+# 
+# RR = RR[c("agey","agea","agee","avg_zscore_price_index","genderFemale","case_rate"),]
+# 
+# abbreviated_1 = RR[,1]
+# abbreviated_2 = RR[,2]
+# abbreviated_3 = RR[,3]
+# abbreviated_4 = RR[,4]
+# 
+# 
+# tabletext=cbind(
+#   c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
+#   c("aRR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
+#   c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
+#   c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
+#   c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
+# tabletext
+# png("forestplot_RR.png", width = 2400, height = 980)
+# forestplot(labeltext = tabletext, 
+#            mean = c(NA, abbreviated_1), 
+#            lower = c(NA, abbreviated_2), 
+#            upper = c(NA, abbreviated_3), 
+#            ci.vertices = T,
+#            is.summary = c(TRUE, rep(FALSE, 7)),
+#            fn.ci_norm = fpDrawCircleCI, 
+#            boxsize = 0.3,
+#            txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
+#            xlab = " ",
+#            lwd.ci = 6,
+#            xlog = TRUE,
+#            #xticks = c(0, 1, 2, 3, 4, 5, 6),
+#            hrzl_lines = gpar(col = "#444444"),
+#            linesheight = "lines", 
+#            new_page = FALSE,
+#            col = fpColors(box = c("black"), lines = "black"))
+# dev.off()
+# 
+# # some resources for how tung modeled this code:
+# # https://stats.idre.ucla.edu/stata/faq/how-can-i-estimate-relative-risk-using-glm-for-common-outcomes-in-cohort-studies/
+# # tung chose log-binomial regression model instead of the "Poisson regression with robust error variance"
+# 
+# ######Robust poisson model for calculation of RR########
+# library(robust)
+# library(robustbase)
+# 
+# #merged$age <- as.character(merged$age)
+# #merged$gender <- as.character(merged$gender)
+# #class(merged$age)
+# class(merged$mask)
+# merged_new <- merged
+# merged_new$mask <- as.numeric(merged_new$mask)
+# class(merged_new$age)
+# model1 = glmrob(mask ~ age_two_bins + avg_zscore_price_index + gender + case_rate, data = merged_new,
+#                    family = "poisson")
+# summary(model1)
+# 
+# model2 = glmRob(mask ~ age_two_bins + avg_zscore_price_index + gender + case_rate, data = merged_new,
+#                 family = "poisson")
+# summary(model2)
+# 
+# OR1 = data.frame(exp(cbind("Odds ratio" = coef(model1), confint.default(model1, level = 0.95))), pvalue = summary(model1)$coefficients[,4], check.names = F)
+# OR1
+# 
+# OR2 = data.frame(exp(cbind("Odds ratio" = coef(model2))), pvalue = summary(model2)$coefficients[,4], check.names = F)
+# OR2
+# 
+# coef(model2)
+# 
+# # ran into issue of starting value with age, so I used the solution from https://stackoverflow.com/questions/31342637/error-please-supply-starting-values
+# set.seed(123)
+# #coefini = coef(glm(mask ~ gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log")))
+# #modelRR = glm(mask ~ age + gender + case_rate + avg_zscore_price_index, data = merged, family = binomial(link="log"), start=c(coefini,0,0,0))
+# summary(modelRR)
+# exp(coef(modelRR))
+# 
+# model = modelRR
+# 
+# RR = data.frame(exp(cbind("Relative risk" = coef(model), confint.default(model, level = 0.95))), pvalue = summary(model)$coefficients[,4], check.names = F)
+# RR
+# 
+# RR = RR[c("agey","agea","agee","avg_zscore_price_index","genderFemale","case_rate"),]
+# 
+# abbreviated_1 = RR[,1]
+# abbreviated_2 = RR[,2]
+# abbreviated_3 = RR[,3]
+# abbreviated_4 = RR[,4]
+# 
+# 
+# tabletext=cbind(
+#   c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence"),
+#   c("aRR", formatC(abbreviated_1, digits = 2, drop0trailing = FALSE, format = "f")),
+#   c("Lower CI", formatC(abbreviated_2, digits = 2, format = "f", drop0trailing = FALSE)),
+#   c("Upper CI", formatC(abbreviated_3, digits = 2, format = "f", drop0trailing = FALSE)),
+#   c("P-value", formatC(abbreviated_4, format = "e", digits = 2)))
+# tabletext
+# png("forestplot_RR.png", width = 2400, height = 980)
+# forestplot(labeltext = tabletext, 
+#            mean = c(NA, abbreviated_1), 
+#            lower = c(NA, abbreviated_2), 
+#            upper = c(NA, abbreviated_3), 
+#            ci.vertices = T,
+#            is.summary = c(TRUE, rep(FALSE, 7)),
+#            fn.ci_norm = fpDrawCircleCI, 
+#            boxsize = 0.3,
+#            txt_gp = fpTxtGp(ticks = gpar(cex = 3.6), xlab = gpar(cex = 3), label = gpar(cex =4)),
+#            xlab = " ",
+#            lwd.ci = 6,
+#            xlog = TRUE,
+#            #xticks = c(0, 1, 2, 3, 4, 5, 6),
+#            hrzl_lines = gpar(col = "#444444"),
+#            linesheight = "lines", 
+#            new_page = FALSE,
+#            col = fpColors(box = c("black"), lines = "black"))
+# dev.off()
+# 
+# ############
+# #Section looking at effect of masks on future covid growth
+# 
+# merged_growth <- merged %>% 
+#   mutate(diff = (case_rate_june19-case_rate)) %>% 
+#   group_by(county, date) %>% 
+#   summarize(percentage_mask_wearing = sum(mask)/n()*100, diff, pop_total) %>% unique()
+# 
+# incidence_model <- glm(diff ~ percentage_mask_wearing + pop_total, data = merged_growth)
+# summary(incidence_model)
+# cor(merged_growth$percentage_mask_wearing, merged_growth$diff)
+# plot(merged_growth$pop_total, merged_growth$diff)
+# plot(merged_growth$percentage_mask_wearing, merged_growth$diff)
