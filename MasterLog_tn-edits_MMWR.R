@@ -282,6 +282,46 @@ se <- sqrt(diag(vcov(mixed_effects_homemade_a)))
                          se))
 exp(tab_homemade)
 summary(mixed_effects_homemade_a)
+
+#######SECTION 4: Calculating IQR
+all = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county!="dane", gender==0) %>% 
+  group_by(id) %>% 
+  summarize(mask_we_perc = sum(mask)/n())
+summary(all$mask_we_perc)
+
+all = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county!="dane", gender==1) %>% 
+  group_by(id) %>% 
+  summarize(mask_we_perc = sum(mask)/n())
+summary(all$mask_we_perc)
+
+all = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county!="dane", age=="c") %>% 
+  group_by(id) %>% 
+  summarize(mask_we_perc = sum(mask)/n())
+summary(all$mask_we_perc)
+
+all = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county!="dane", age=="y") %>% 
+  group_by(id) %>% 
+  summarize(mask_we_perc = sum(mask)/n())
+summary(all$mask_we_perc)
+all = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county!="dane", age=="a") %>% 
+  group_by(id) %>% 
+  summarize(mask_we_perc = sum(mask)/n())
+summary(all$mask_we_perc)
+all = read.csv("InputData/meta_merged_observed_Oct31correction.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county!="dane", age=="e") %>% 
+  group_by(id) %>% 
+  summarize(mask_we_perc = sum(mask)/n())
+summary(all$mask_we_perc)
+all = read.csv("InputData/meta_merged_observed.csv",row.names = 1, check.names = F, stringsAsFactors = 1) %>% 
+  filter(county=="dane", mask == 1) %>% 
+  summarize(mask_we_perc = sum(homeade)/n())
+
+summary(all$mask_we_perc)
 # # SECTION 4: Plot figure 1B for aOR ####
 # tabletext=cbind(
 #   c(" ", "Young adult", "Adult", "Older adult", "High price index", "Female gender", "High case prevalence/10K", "Large population/10K", "Case prevalence:population"),
